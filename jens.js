@@ -1,5 +1,5 @@
 class Jens {
-    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","class","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","title","translate","type","usemap","value","width","wrap"]');
+    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","class","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
     tree = [];
 
@@ -11,22 +11,25 @@ class Jens {
         this.tree = [];
     }
 
-    createFromTemplateName(templateName, data = {}) {
+    createFromTemplateName(templateName, data = {}, ignoreTree = false) {
         let template = this.elements[templateName];
         if (template === undefined) {
             return null;
         }
-        let crypto = new Cryptography();
-        this.addToTree(this.tree, crypto.hash(JSON.stringify(template)+JSON.stringify(data)).toString());
+        if (!ignoreTree) this.addToTree(this.tree, this.getTreeId(template, data, template.tag), data);
         return this.parseElement(template, data);
     }
 
-    createFromTemplate(template, data = {}) {
+    getTreeId(template, data, name) {
+        let crypto = new Cryptography();
+        return crypto.hash(JSON.stringify(template)+JSON.stringify(data)).toString()+"_"+name;
+    }
+
+    createFromTemplate(template, data = {}, ignoreTree = false) {
         if (template === undefined) {
             return null;
         }
-        let crypto = new Cryptography();
-        this.addToTree(this.tree, crypto.hash(JSON.stringify(template)+JSON.stringify(data)).toString());
+        if (!ignoreTree) this.addToTree(this.tree, this.getTreeId(template, data, template.tag), data);
         return this.parseElement(template, data);
     }
 
@@ -54,6 +57,18 @@ class Jens {
                 }
             }
             parsedElement = this.createFromTemplateName(element.name, data);
+        } else if (element.tag === "templateList") {
+            if (element.dataEndpoint !== undefined && element.keyMap !== undefined) {
+                let data = this.getJsonFromEndpoint(element.dataEndpoint);
+                let uuid = Jens.UUID.generate();
+                let list = document.createElement("div");
+                list.setAttribute("uuid", uuid);
+                data.then((data) => {
+                    this.resetTree();
+                    this.addDataToList(data, element, uuid, this);
+                });
+                parsedElement = list;
+            }
         } else {
             parsedElement = document.createElement(element.tag);
         }
@@ -81,13 +96,100 @@ class Jens {
         return parsedElement;
     }
 
-    addToTree(tree, templateHash) {
+    addDataToList(data, element, uuid, jens) {
+        let elementList = [];
+        for (let elementData of data) {
+            for (let key in element.keyMap) {
+                if (typeof element.keyMap[key] !== "string") {
+                    if (element.keyMap[key] instanceof RegExp) {
+                        // match with regex
+                        let dataFromFilter = Jens.getFilteredData(elementData, element.keyMap[key], 1);
+                        if (dataFromFilter !== undefined) {
+                            data[key] = dataFromFilter;
+                        }
+                    } else {
+                        throw new Error("Invalid keyMap");
+                    }
+                } else {
+                    // direct match via property name
+                    data[key] = elementData[element.keyMap[key]];
+                }
+            }
+            let listElement = jens.createFromTemplateName(element.name, data, true);
+            elementList.push(listElement);
+        }
+        let listNode = document.querySelector('[uuid="'+uuid+'"]');
+        jens.appendToListNode(elementList, listNode);
+    }
+
+    static getFilteredData(data, filter) {
+        let filterData = data;
+        let tempData;
+        try {
+            filterData = JSON.parse(data);
+        } catch (e) {
+            // do nothing
+        }
+        if (filterData instanceof String || filterData instanceof Number || filterData instanceof Boolean) {
+            tempData = Jens.getIfMatchingRegexFilter(filterData, filter);
+        } else {
+            tempData = Jens.checkObjectArrays(filterData, filter);
+        }
+        if (tempData !== undefined) {
+            return tempData;
+        }
+        return this.checkObjectArrays(filterData, filter);
+    }
+
+    static checkObjectArrays(data, filter) {
+        if (data instanceof Object || data instanceof Array) {
+            for (let key in data) {
+                try {
+                    data[key] = JSON.parse(data[key]);
+                } catch (e) {
+                    // do nothing
+                }
+
+                if (typeof(data[key]) === "number") {
+                    data[key] = "" + data[key].toString() + "";
+                }
+                if (typeof data[key] !== "string") {
+                    let arrayData = this.checkObjectArrays(data[key], filter);
+                    if (arrayData !== undefined) {
+                        return arrayData;
+                    }
+                    continue;
+                }
+
+                let tempData = Jens.getIfMatchingRegexFilter(data[key], filter);
+                if (tempData !== undefined) {
+                    return tempData;
+                }
+            }
+        } else {
+            throw new Error("Unsupported data type: " + typeof data);
+        }
+    }
+
+    static getIfMatchingRegexFilter(data, filter) {
+        if (typeof data !== "string") {
+            return undefined;
+        }
+        let regex = new RegExp(filter);
+        if (regex.test(data)) {
+            return data;
+        }
+        return undefined;
+    }
+
+    addToTree(tree, templateHash, data) {
         if (this.tree.includes(templateHash)) {
             let tree = this.tree;
             console.log("tree: ");
             console.log({tree});
             console.log("duplicate element: ");
             console.log({parsedElement: templateHash});
+            console.log({data});
             throw new Error("Detected circular reference");
         }
         this.tree.push(templateHash);
@@ -100,6 +202,9 @@ class Jens {
                 node = this.matchOneOnOneProperty(node, element, data, "text", "id");
                 node.id = node.id.replace(/\s/g, '-').toLowerCase();
             }
+        }
+        if (element.html !== undefined) {
+            node = this.matchOneOnOneProperty(node, element, data, "html", "innerHTML");
         }
         if (element.css !== undefined) {
             for (let key in element.css) {
@@ -121,6 +226,7 @@ class Jens {
             }
         }
         if (!(node instanceof HTMLElement)) {
+            console.log({element, data});
             throw new Error('Could not create element from template');
         }
         return node;
@@ -242,15 +348,50 @@ class Jens {
         }
         return undefined;
     }
+
+    async getJsonFromEndpoint(dataEndpoint) {
+        let response = await fetch(dataEndpoint);
+        return await response.json();
+    }
+
+    appendToListNode(elementList, node) {
+        for (let element of elementList) {
+            node.appendChild(element);
+        }
+    }
+
+    /**
+     * Fast UUID generator, RFC4122 version 4 compliant.
+     * @author Jeff Ward (jcward.com).
+     * @license MIT license
+     * @link http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript/21963136#21963136
+     **/
+    static UUID = (function() {
+        const self = {};
+        const lut = [];
+        for (let i=0; i<256; i++) { lut[i] = (i<16?'0':'')+(i).toString(16); }
+        self.generate = function() {
+            const d0 = Math.random() * 0xffffffff | 0;
+            const d1 = Math.random() * 0xffffffff | 0;
+            const d2 = Math.random() * 0xffffffff | 0;
+            const d3 = Math.random() * 0xffffffff | 0;
+            return lut[d0&0xff]+lut[d0>>8&0xff]+lut[d0>>16&0xff]+lut[d0>>24&0xff]+'-'+
+                lut[d1&0xff]+lut[d1>>8&0xff]+'-'+lut[d1>>16&0x0f|0x40]+lut[d1>>24&0xff]+'-'+
+                lut[d2&0x3f|0x80]+lut[d2>>8&0xff]+'-'+lut[d2>>16&0xff]+lut[d2>>24&0xff]+
+                lut[d3&0xff]+lut[d3>>8&0xff]+lut[d3>>16&0xff]+lut[d3>>24&0xff];
+        }
+        return self;
+    })();
 }
 
 class Cryptography
 {
     hash(string) {
-        if (CryptoJS !== undefined) {
+        try {
             return CryptoJS.MD5(string).toString();
+        } catch (e) {
+            return this.MD5(string);
         }
-        return this.MD5(string);
     }
 
     //  A formatted version of a popular md5 implementation.
