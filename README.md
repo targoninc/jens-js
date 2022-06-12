@@ -6,6 +6,9 @@ https://jensjs.com/
 - Continually check for `condition` statements and make rendering dynamic
 - Enable recursion with defined depth levels and data for each level
 
+# Issue tracking
+- Please use **Github Issues** for bug reports, feature suggestions, etc.
+
 # 0.2
 - Added the `onappend` method possibility to templates, which is functionally the same as `onload` 
 
