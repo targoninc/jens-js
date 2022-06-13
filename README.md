@@ -9,11 +9,6 @@ https://jensjs.com/
 # Issue tracking
 - Please use **Github Issues** for bug reports, feature suggestions, etc.
 
-# 0.2
-- Added the `onappend` method possibility to templates, which is functionally the same as `onload` 
-
-# 0.1
-- Added option to add element list into constructor
-- Added method to create from a template object
-- Added method to create by template name (will use the one saved via constructor)
-- Circular reference / Recursion detection
+# Features
+- Easy templating with native JS objects
+- Simple reactivity with exposing functions and subscribing to them from other elements
