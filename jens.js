@@ -1,10 +1,51 @@
+class DataBinder {
+    actions = {};
+
+    subscribeToAction(key, args) {
+        if (this.actions[key] === undefined) {
+            this.actions[key] = {
+                subscribers: [],
+            };
+        }
+        if (this.actions[key].subscribers === undefined) {
+            this.actions[key].subscribers = [];
+        }
+        this.actions[key].subscribers.push(args);
+    }
+
+    runAction(key) {
+        this.actions[key].subscribers.forEach(subscriber => {
+            let args = subscriber;
+            if (this.actions[key].defaultArgs !== undefined && this.actions[key].defaultArgs.length > args.length) {
+                let toAddArgs = this.actions[key].defaultArgs.slice(args.length);
+                args = args.concat(toAddArgs);
+            }
+            this.actions[key].run(...args);
+        });
+    }
+
+    exposeAction(action, key, args) {
+        if (this.actions[key] === undefined) {
+            this.actions[key] = {};
+        }
+
+        this.actions[key].run = action;
+        this.actions[key].defaultArgs = args;
+    }
+}
+
 class Jens {
     HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","class","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
     tree = [];
 
-    constructor(elements) {
+    constructor(elements, dataBinder) {
         this.elements = elements;
+        if (dataBinder !== undefined) {
+            this.dataBinder = dataBinder;
+        } else {
+            this.dataBinder = new DataBinder();
+        }
     }
 
     resetTree() {
@@ -100,26 +141,30 @@ class Jens {
         let elementList = [];
         for (let elementData of data) {
             for (let key in element.keyMap) {
-                if (typeof element.keyMap[key] !== "string") {
-                    if (element.keyMap[key] instanceof RegExp) {
-                        // match with regex
-                        let dataFromFilter = Jens.getFilteredData(elementData, element.keyMap[key], 1);
-                        if (dataFromFilter !== undefined) {
-                            data[key] = dataFromFilter;
-                        }
-                    } else {
-                        throw new Error("Invalid keyMap");
-                    }
-                } else {
-                    // direct match via property name
-                    data[key] = elementData[element.keyMap[key]];
-                }
+                this.mapDataSingle(element, key, elementData, data);
             }
             let listElement = jens.createFromTemplateName(element.name, data, true);
             elementList.push(listElement);
         }
         let listNode = document.querySelector('[uuid="'+uuid+'"]');
         jens.appendToListNode(elementList, listNode);
+    }
+
+    mapDataSingle(element, key, elementData, data) {
+        if (typeof element.keyMap[key] !== "string") {
+            if (element.keyMap[key] instanceof RegExp) {
+                // match with regex
+                let dataFromFilter = Jens.getFilteredData(elementData, element.keyMap[key], 1);
+                if (dataFromFilter !== undefined) {
+                    data[key] = dataFromFilter;
+                }
+            } else {
+                throw new Error("Invalid keyMap");
+            }
+        } else {
+            // direct match via property name
+            data[key] = elementData[element.keyMap[key]];
+        }
     }
 
     static getFilteredData(data, filter) {
@@ -211,6 +256,31 @@ class Jens {
                 node.style[key] = this.getReferenceData(element.css[key], data);
             }
         }
+        if (element.subscribe !== undefined) {
+            if (element.subscribe.key === undefined) {
+                throw new Error("subscribe requires at least a key");
+            }
+
+            if (element.subscribe.args === undefined) {
+                element.subscribe.args = [];
+            }
+            element.subscribe.args.unshift(node);
+            this.dataBinder.subscribeToAction(element.subscribe.key, element.subscribe.args)
+        }
+        if (element.expose !== undefined) {
+            if (element.expose.action === undefined || element.expose.event === undefined) {
+                throw new Error("expose requires at least an action and an event");
+            }
+
+            if (element.expose.args === undefined) {
+                element.expose.args = [];
+            }
+            element.expose.args.unshift(node);
+            this.dataBinder.exposeAction(element.expose.action, element.expose.key, element.expose.args)
+            node.addEventListener(element.expose.event, () => {
+                this.dataBinder.runAction(element.expose.key);
+            });
+        }
         if (element.tag === "form") {
             setTimeout(() => {
                 this.formProgressInit(node.id);
@@ -230,47 +300,6 @@ class Jens {
             throw new Error('Could not create element from template');
         }
         return node;
-    }
-
-    formProgressInit(nodeID) {
-        try {
-            let form = document.querySelector('#' + nodeID);
-            let progress = form.parentElement.querySelector("progress");
-            let submit = form.parentElement.querySelector("button[type=submit]");
-            let successIndicator = form.parentElement.querySelector(".success");
-            let detailBlocks = form.querySelectorAll("details");
-            submit.onclick = function (e) {
-                e.preventDefault();
-                $(submit).ajaxForm({
-                    type: 'post',
-                    target: successIndicator,
-                    success: function() {
-                        form.style.display = "none";
-                        progress.style.display = "none";
-                        $(this.target).css("display", "initial");
-                    },
-                    beforeSubmit: function (arr, form, options) {
-                        submit.style.display = "none";
-                        progress.style.display = "block";
-                        for (let block of detailBlocks) {
-                            block.open = false;
-                        }
-                        $(progress).val(0);
-                        progress.innerHTML = '0%';
-                    },
-                    uploadProgress: function (event, position, total, percentComplete) {
-                        $(progress).val(percentComplete);
-                        console.log(percentComplete);
-                        progress.innerHTML = percentComplete + '%';
-                        if (percentComplete === 100) {
-                            successIndicator.innerHTML = "Processing...";
-                        }
-                    },
-                }).submit();
-            };
-        } catch (e) {
-            // fail silently, it *might* be intended
-        }
     }
 
     addClassesToElement(element, data, node) {
@@ -527,5 +556,4 @@ class Cryptography
     }
 }
 
-export const { createFromTemplate, createFromTemplateName } = new Jens();
 export { Jens };
