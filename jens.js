@@ -252,8 +252,9 @@ class Jens {
             node = this.matchOneOnOneProperty(node, element, data, "html", "innerHTML");
         }
         if (element.css !== undefined) {
-            for (let key in element.css) {
-                node.style[key] = this.getReferenceData(element.css[key], data);
+            let css = this.getReferenceData(element.css, data);
+            for (let key in css) {
+                node.style[key] = this.getReferenceData(css[key], data);
             }
         }
         if (element.subscribe !== undefined) {
@@ -359,10 +360,13 @@ class Jens {
     }
 
     getReferenceData(property, data) {
+        if (typeof(property) !== "string") {
+            return property;
+        }
         try {
             property.startsWith('');
         } catch (e) {
-            return undefined;
+            return property;
         }
         if (property.startsWith(this.referencePrefix)) {
             if (data !== undefined && data[property.substring(this.referencePrefix.length)] !== undefined) {
@@ -375,7 +379,7 @@ class Jens {
             }
             return property.substring(this.referencePrefix.length);
         }
-        return undefined;
+        return property;
     }
 
     async getJsonFromEndpoint(dataEndpoint) {

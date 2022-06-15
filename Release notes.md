@@ -1,13 +1,4 @@
-# Roadmap
-- Automatically let lists generate based on input data and a flag within the template to enable it
-- Continually check for `condition` statements and make rendering dynamic
-- Enable recursion with defined depth levels and data for each level
-
-# 0.2
-- Added the `onappend` method possibility to templates, which is functionally the same as `onload` 
-
-# 0.1
-- Added option to add element list into constructor
-- Added method to create from a template object
-- Added method to create by template name (will use the one saved via constructor)
-- Circular reference / Recursion detection
+# Changelog
+- Added `expose` key which takes `action (function reference or function)`, `event (addEventListener event)`, `key (name to expose the function under)` and `args (array of arguments)` as sub-keys
+- Added `subscribe` key which takes `key (name of exposed function)` and `args (array of arguments)` as sub-keys
+- Enabled using references for entire css key and stabilize behaviour or getting reference data 
