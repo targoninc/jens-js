@@ -35,7 +35,7 @@ class DataBinder {
 }
 
 class Jens {
-    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","class","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
+    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
     tree = [];
 
@@ -289,7 +289,10 @@ class Jens {
         }
         node = this.matchOneOnOneProperties(node, element, data, this.HTMLattributes);
         if (element.classes !== undefined) {
-            node = this.addClassesToElement(element, data, node);
+            node = this.addClassesToElement(element.classes, data, node);
+        }
+        if (element.class !== undefined) {
+            node = this.addClassesToElement(element.class, data, node);
         }
         if (element.attributes !== undefined) {
             for (let key in element.attributes) {
@@ -303,10 +306,10 @@ class Jens {
         return node;
     }
 
-    addClassesToElement(element, data, node) {
+    addClassesToElement(classes, data, node) {
         let refData = undefined;
-        if (!this.isArray(element.classes)) {
-            refData = this.getReferenceData(element.classes, data);
+        if (!this.isArray(classes)) {
+            refData = this.getReferenceData(classes, data);
         }
         if (refData !== undefined) {
             if (!this.isArray(refData)) {
@@ -318,7 +321,7 @@ class Jens {
             }
             return node;
         }
-        for (let className of element.classes) {
+        for (let className of classes) {
             let refData = this.getReferenceData(className, data);
             node.classList.add(refData === undefined ? className : refData);
         }
