@@ -35,7 +35,7 @@ class DataBinder {
 }
 
 class Jens {
-    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
+    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","page","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
     tree = [];
 
@@ -91,14 +91,14 @@ class Jens {
         }
 
         let parsedElement;
-        if (element.tag === "template") {
+        if (element.template !== undefined) {
             if (element.data !== undefined) {
                 for (let key in element.data) {
                     data[key] = element.data[key];
                 }
             }
-            parsedElement = this.createFromTemplateName(element.name, data);
-        } else if (element.tag === "templateList") {
+            parsedElement = this.createFromTemplateName(element.template, data);
+        } else if (element.templateList !== undefined) {
             if (element.dataEndpoint !== undefined && element.keyMap !== undefined) {
                 let data = this.getJsonFromEndpoint(element.dataEndpoint);
                 let uuid = Jens.UUID.generate();
@@ -143,7 +143,7 @@ class Jens {
             for (let key in element.keyMap) {
                 this.mapDataSingle(element, key, elementData, data);
             }
-            let listElement = jens.createFromTemplateName(element.name, data, true);
+            let listElement = jens.createFromTemplateName(element.templateList, data, true);
             elementList.push(listElement);
         }
         let listNode = document.querySelector('[uuid="'+uuid+'"]');
@@ -252,10 +252,8 @@ class Jens {
             node = this.matchOneOnOneProperty(node, element, data, "html", "innerHTML");
         }
         if (element.css !== undefined) {
-            let css = this.getReferenceData(element.css, data);
-            for (let key in css) {
-                node.style[key] = this.getReferenceData(css[key], data);
-            }
+            let css = this.getData(element.css, data);
+            this.setCssArray(node, css);
         }
         if (element.subscribe !== undefined) {
             if (element.subscribe.key === undefined) {
@@ -306,14 +304,20 @@ class Jens {
         return node;
     }
 
+    setCssArray(node, css) {
+        for (let key in css) {
+            node.style[key] = this.getData(css[key], data);
+        }
+    }
+
     addClassesToElement(classes, data, node) {
         let refData = undefined;
         if (!this.isArray(classes)) {
-            refData = this.getReferenceData(classes, data);
+            refData = this.getData(classes, data);
         }
         if (refData !== undefined) {
             if (!this.isArray(refData)) {
-                node.classList.add(refData);
+                this.addClassesToElement(refData, data, node);
                 return node;
             }
             for (let className of refData) {
@@ -322,8 +326,11 @@ class Jens {
             return node;
         }
         for (let className of classes) {
-            let refData = this.getReferenceData(className, data);
-            node.classList.add(refData === undefined ? className : refData);
+            let refData = this.getData(className, data);
+            if (refData === undefined) {
+                refData = className;
+            }
+            node.classList.add(refData.toString());
         }
         return node;
     }
@@ -342,7 +349,7 @@ class Jens {
     matchOneOnOneProperty(node, ref, data, property, overwriteProperty = undefined) {
         if (ref[property] !== undefined) {
             if (data !== null) {
-                let refData = this.getReferenceData(ref[property], data);
+                let refData = this.getData(ref[property], data);
                 if (refData !== undefined) {
                     this.writeToProperty(node, refData, property, overwriteProperty);
                     return node
@@ -362,7 +369,7 @@ class Jens {
         return node;
     }
 
-    getReferenceData(property, data) {
+    getData(property, data) {
         if (typeof(property) !== "string") {
             return property;
         }
@@ -373,7 +380,7 @@ class Jens {
         }
         if (property.startsWith(this.referencePrefix)) {
             if (data !== undefined && data[property.substring(this.referencePrefix.length)] !== undefined) {
-                let tempData = this.getReferenceData(data[property.substring(this.referencePrefix.length)], data);
+                let tempData = this.getData(data[property.substring(this.referencePrefix.length)], data);
                 if (tempData !== undefined) {
                     return tempData;
                 } else {
