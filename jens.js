@@ -52,7 +52,7 @@ class Jens {
         this.tree = [];
     }
 
-    createFromTemplateName(templateName, data = {}, ignoreTree = false) {
+    createFromTemplateName(templateName, data = {}, ignoreTree = true) {
         let template = this.elements[templateName];
         if (template === undefined) {
             return null;
@@ -66,7 +66,7 @@ class Jens {
         return crypto.hash(JSON.stringify(template)+JSON.stringify(data)).toString()+"_"+name;
     }
 
-    createFromTemplate(template, data = {}, ignoreTree = false) {
+    createFromTemplate(template, data = {}, ignoreTree = true) {
         if (template === undefined) {
             return null;
         }
@@ -253,27 +253,39 @@ class Jens {
         }
         if (element.css !== undefined) {
             let css = this.getData(element.css, data);
-            this.setCssArray(node, css);
+            this.setCssArray(node, css, data);
         }
         if (element.subscribe !== undefined) {
             if (element.subscribe.key === undefined) {
                 throw new Error("subscribe requires at least a key");
             }
 
-            if (element.subscribe.args === undefined) {
-                element.subscribe.args = [];
+            element.subscribe.args = element.subscribe.args ?? [];
+
+            for (let i = 0; i < element.subscribe.args.length; i++) {
+                element.subscribe.args[i] = this.getData(element.subscribe.args[i], data);
             }
+
             element.subscribe.args.unshift(node);
             this.dataBinder.subscribeToAction(element.subscribe.key, element.subscribe.args)
+
+            if (element.subscribe.event) {
+                node.addEventListener(element.subscribe.event, () => {
+                    this.dataBinder.runAction(element.subscribe.key);
+                });
+            }
         }
         if (element.expose !== undefined) {
             if (element.expose.action === undefined || element.expose.event === undefined) {
                 throw new Error("expose requires at least an action and an event");
             }
 
-            if (element.expose.args === undefined) {
-                element.expose.args = [];
+            element.expose.args = element.expose.args ?? [];
+
+            for (let i = 0; i < element.expose.args.length; i++) {
+                element.expose.args[i] = this.getData(element.expose.args[i], data);
             }
+
             element.expose.args.unshift(node);
             this.dataBinder.exposeAction(element.expose.action, element.expose.key, element.expose.args)
             node.addEventListener(element.expose.event, () => {
