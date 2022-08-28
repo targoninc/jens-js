@@ -16,12 +16,16 @@ class DataBinder {
     runAction(key) {
         this.actions[key].subscribers.forEach(subscriber => {
             let args = subscriber;
-            if (this.actions[key].defaultArgs !== undefined && this.actions[key].defaultArgs.length > args.length) {
+            if (this.actions[key].defaultArgs !== undefined) {
                 let toAddArgs = this.actions[key].defaultArgs.slice(args.length);
                 args = args.concat(toAddArgs);
             }
             this.actions[key].run(...args);
         });
+    }
+
+    runActionWithArgs(key, args) {
+        this.actions[key].run(...args);
     }
 
     exposeAction(action, key, args) {
@@ -255,43 +259,6 @@ class Jens {
             let css = this.getData(element.css, data);
             this.setCssArray(node, css, data);
         }
-        if (element.subscribe !== undefined) {
-            if (element.subscribe.key === undefined) {
-                throw new Error("subscribe requires at least a key");
-            }
-
-            element.subscribe.args = element.subscribe.args ?? [];
-
-            for (let i = 0; i < element.subscribe.args.length; i++) {
-                element.subscribe.args[i] = this.getData(element.subscribe.args[i], data);
-            }
-
-            element.subscribe.args.unshift(node);
-            this.dataBinder.subscribeToAction(element.subscribe.key, element.subscribe.args)
-
-            if (element.subscribe.event) {
-                node.addEventListener(element.subscribe.event, () => {
-                    this.dataBinder.runAction(element.subscribe.key);
-                });
-            }
-        }
-        if (element.expose !== undefined) {
-            if (element.expose.action === undefined || element.expose.event === undefined) {
-                throw new Error("expose requires at least an action and an event");
-            }
-
-            element.expose.args = element.expose.args ?? [];
-
-            for (let i = 0; i < element.expose.args.length; i++) {
-                element.expose.args[i] = this.getData(element.expose.args[i], data);
-            }
-
-            element.expose.args.unshift(node);
-            this.dataBinder.exposeAction(element.expose.action, element.expose.key, element.expose.args)
-            node.addEventListener(element.expose.event, () => {
-                this.dataBinder.runAction(element.expose.key);
-            });
-        }
         if (element.tag === "form") {
             setTimeout(() => {
                 this.formProgressInit(node.id);
@@ -306,8 +273,51 @@ class Jens {
         }
         if (element.attributes !== undefined) {
             for (let key in element.attributes) {
-                node.setAttribute(key, element.attributes[key]);
+                let refData = this.getData(element.attributes[key], data);
+                node.setAttribute(key, refData);
             }
+        }
+        if (element.subscribe !== undefined) {
+            if (element.subscribe.key === undefined) {
+                throw new Error("subscribe requires at least a key");
+            }
+
+            let args = [];
+            if (element.subscribe.args) {
+                for (const arg of element.subscribe.args) {
+                    args.push(this.getData(arg, data));
+                }
+            }
+
+            if (element.subscribe.addNode) {
+                args.unshift(node);
+            }
+
+            if (element.subscribe.event) {
+                node.addEventListener(element.subscribe.event, () => {
+                    this.dataBinder.runActionWithArgs(element.subscribe.key, args);
+                });
+            }
+        }
+        if (element.expose !== undefined) {
+            if (element.expose.action === undefined || element.expose.event === undefined) {
+                throw new Error("expose requires at least an action and an event");
+            }
+
+            let args = [];
+            if (element.expose.args) {
+                for (const arg of element.expose.args) {
+                    args.push(this.getData(arg, data));
+                }
+            }
+
+            if (element.expose.addNode) {
+                args.unshift(node);
+            }
+            this.dataBinder.exposeAction(element.expose.action, element.expose.key, args)
+            node.addEventListener(element.expose.event, () => {
+                this.dataBinder.runAction(element.expose.key);
+            });
         }
         if (!(node instanceof HTMLElement)) {
             console.log({element, data});
@@ -316,7 +326,7 @@ class Jens {
         return node;
     }
 
-    setCssArray(node, css) {
+    setCssArray(node, css, data) {
         for (let key in css) {
             node.style[key] = this.getData(css[key], data);
         }
