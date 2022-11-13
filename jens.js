@@ -101,7 +101,8 @@ class Jens {
                     data[key] = element.data[key];
                 }
             }
-            parsedElement = this.createFromTemplateName(element.template, data);
+            const templateName = this.getData(element.template, data);
+            parsedElement = this.createFromTemplateName(templateName, data);
         } else if (element.templateList !== undefined) {
             if (element.dataEndpoint !== undefined && element.keyMap !== undefined) {
                 let data = this.getJsonFromEndpoint(element.dataEndpoint);
@@ -343,7 +344,7 @@ class Jens {
                 return node;
             }
             for (let className of refData) {
-                node.classList.add(className);
+                node.classList.add(className.replace(" ", "-"));
             }
             return node;
         }
@@ -352,7 +353,7 @@ class Jens {
             if (refData === undefined) {
                 refData = className;
             }
-            node.classList.add(refData.toString());
+            node.classList.add(refData.toString().replaceAll(" ", "-"));
         }
         return node;
     }
@@ -400,18 +401,20 @@ class Jens {
         } catch (e) {
             return property;
         }
-        if (property.startsWith(this.referencePrefix)) {
-            if (data !== undefined && data[property.substring(this.referencePrefix.length)] !== undefined) {
-                let tempData = this.getData(data[property.substring(this.referencePrefix.length)], data);
-                if (tempData !== undefined) {
-                    return tempData;
-                } else {
-                    return data[property.substring(this.referencePrefix.length)];
-                }
-            }
-            return property.substring(this.referencePrefix.length);
+        if (!property.startsWith(this.referencePrefix)) {
+            return property;
         }
-        return property;
+
+        let lookupValue = data[property.substring(this.referencePrefix.length)];
+        if (data !== undefined && lookupValue !== undefined) {
+            let tempData = this.getData(lookupValue, data);
+            if (tempData !== lookupValue) {
+                return tempData;
+            } else {
+                return lookupValue;
+            }
+        }
+        return property.substring(this.referencePrefix.length);
     }
 
     async getJsonFromEndpoint(dataEndpoint) {
