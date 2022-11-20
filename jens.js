@@ -101,8 +101,8 @@ class Jens {
                     data[key] = element.data[key];
                 }
             }
-            const templateName = this.getData(element.template, data);
-            parsedElement = this.createFromTemplateName(templateName, data);
+            let template = this.getData(element.template, data);
+            parsedElement = this.createFromTemplateName(template, data);
         } else if (element.templateList !== undefined) {
             if (element.dataEndpoint !== undefined && element.keyMap !== undefined) {
                 let data = this.getJsonFromEndpoint(element.dataEndpoint);
@@ -298,6 +298,8 @@ class Jens {
                 node.addEventListener(element.subscribe.event, () => {
                     this.dataBinder.runActionWithArgs(element.subscribe.key, args);
                 });
+            } else {
+                this.dataBinder.subscribeToAction(element.subscribe.key, args);
             }
         }
         if (element.expose !== undefined) {
@@ -401,20 +403,18 @@ class Jens {
         } catch (e) {
             return property;
         }
-        if (!property.startsWith(this.referencePrefix)) {
-            return property;
-        }
-
-        let lookupValue = data[property.substring(this.referencePrefix.length)];
-        if (data !== undefined && lookupValue !== undefined) {
-            let tempData = this.getData(lookupValue, data);
-            if (tempData !== lookupValue) {
-                return tempData;
-            } else {
-                return lookupValue;
+        if (property.startsWith(this.referencePrefix)) {
+            if (data !== undefined && data[property.substring(this.referencePrefix.length)] !== undefined) {
+                let tempData = this.getData(data[property.substring(this.referencePrefix.length)], data);
+                if (tempData !== undefined) {
+                    return tempData;
+                } else {
+                    return data[property.substring(this.referencePrefix.length)];
+                }
             }
+            return property.substring(this.referencePrefix.length);
         }
-        return property.substring(this.referencePrefix.length);
+        return property;
     }
 
     async getJsonFromEndpoint(dataEndpoint) {
