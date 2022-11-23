@@ -7,7 +7,7 @@ https://jensjs.com/
 
 # Roadmap
 - Automatically let lists generate based on input data and a flag within the template to enable it
-- Continually check for `condition` statements and make rendering dynamic
+- Continually check for `condition` statements and make rendering dynamic (at the moment this only happens at template resolving time)
 - Enable recursion with defined depth levels and data for each level
 
 # Issue tracking
