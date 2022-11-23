@@ -38,6 +38,45 @@ class DataBinder {
     }
 }
 
+window.toggleJensDebug = function(colorOverride = null) {
+    if (localStorage.getItem("jens:debug") === "true") {
+        localStorage.setItem("jens:debug", "false");
+        localStorage.removeItem("jens:debug-color");
+    } else {
+        localStorage.setItem("jens:debug", "true");
+        if (colorOverride != null) {
+            localStorage.setItem("jens:debug-color", colorOverride);
+        } else {
+            localStorage.removeItem("jens:debug-color");
+        }
+    }
+    checkForDebugMode();
+}
+
+function checkForDebugMode() {
+    if (localStorage.getItem("jens:debug") === "true") {
+        if (document.querySelector("#jens-debug-style")) {
+            return;
+        }
+        let style = document.createElement("style");
+        style.id = "jens-debug-style";
+        let customColor = localStorage.getItem("jens:debug-color");
+        if (customColor != null) {
+            if (customColor.includes(";")) {
+                customColor = null;
+            }
+        }
+        const jensJsDebugColor = customColor ?? "rgba(255, 0, 0, 0.5)";
+        style.innerHTML = `.jensJsTemplate { border: 1px dotted ${jensJsDebugColor}; }`;
+        document.head.appendChild(style);
+    } else {
+        const debugStyle = document.querySelectorAll("#jens-debug-style");
+        for (let i = 0; i < debugStyle.length; i++) {
+            debugStyle[i].remove();
+        }
+    }
+}
+
 class Jens {
     HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","page","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
@@ -50,6 +89,8 @@ class Jens {
         } else {
             this.dataBinder = new DataBinder();
         }
+
+        checkForDebugMode();
     }
 
     resetTree() {
@@ -138,6 +179,8 @@ class Jens {
             console.log({element, data});
             throw new Error('Could not create element from template');
         }
+
+        parsedElement.classList.add("jensJsTemplate");
 
         return parsedElement;
     }
@@ -403,18 +446,20 @@ class Jens {
         } catch (e) {
             return property;
         }
-        if (property.startsWith(this.referencePrefix)) {
-            if (data !== undefined && data[property.substring(this.referencePrefix.length)] !== undefined) {
-                let tempData = this.getData(data[property.substring(this.referencePrefix.length)], data);
-                if (tempData !== undefined) {
-                    return tempData;
-                } else {
-                    return data[property.substring(this.referencePrefix.length)];
-                }
-            }
-            return property.substring(this.referencePrefix.length);
+        if (!property.startsWith(this.referencePrefix)) {
+            return property;
         }
-        return property;
+
+        let lookupValue = data[property.substring(this.referencePrefix.length)];
+        if (data !== undefined && lookupValue !== undefined) {
+            let tempData = this.getData(lookupValue, data);
+            if (tempData !== lookupValue) {
+                return tempData;
+            } else {
+                return lookupValue;
+            }
+        }
+        return property.substring(this.referencePrefix.length);
     }
 
     async getJsonFromEndpoint(dataEndpoint) {
