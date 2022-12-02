@@ -39,7 +39,7 @@ class DataBinder {
 }
 
 window.toggleJensDebug = function(colorOverride = null) {
-    if (localStorage.getItem("jens:debug") === "true") {
+    if (debugModeEnabled()) {
         localStorage.setItem("jens:debug", "false");
         localStorage.removeItem("jens:debug-color");
     } else {
@@ -54,7 +54,7 @@ window.toggleJensDebug = function(colorOverride = null) {
 }
 
 function checkForDebugMode() {
-    if (localStorage.getItem("jens:debug") === "true") {
+    if (debugModeEnabled()) {
         if (document.querySelector("#jens-debug-style")) {
             return;
         }
@@ -77,13 +77,39 @@ function checkForDebugMode() {
     }
 }
 
+function debugModeEnabled() {
+    return localStorage.getItem("jens:debug") === "true";
+}
+
 class Jens {
-    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","page","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
+    HTMLattributes = JSON.parse('["accept","accept-charset","accesskey","action","alt","async","autocomplete","autofocus","autoplay","charset","checked","cite","cols","colspan","content","contenteditable","controls","coords","data","data-*","datetime","default","defer","dir","dirname","disabled","downloads","draggable","enctype","for","form","formaction","headers","height","hidden","high","href","hreflang","http-equiv","id","ismap","kind","label","lang","list","loop","low","max","maxlength","media","method","min","multiple","muted","name","novalidate","onabort","onafterprint","onbeforeprint","onbeforeunload","onblur","oncanplay","oncanplaythrough","onchange","onclick","oncontextmenu","oncopy","oncuechange","oncut","ondblclick","ondrag","ondragend","ondragenter","ondragleave","ondragover","ondragstart","ondrop","ondurationchange","onemptied","onended","onerror","onfocus","onhashchange","oninput","oninvalid","onkeydown","onkeypress","onkeyup","onload","onloadeddata","onloadedmetadata","onloadstart","onmouseenter","onmouseleave","onmousedown","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onoffline","ononline","onpageshow","onpaste","onpause","onplay","onplaying","onprogress","onratechange","onreset","onresize","onscroll","onsearch","onseeked","onseeking","onselect","onstalled","onsubmit","onsuspend","ontimeupdate","ontoggle","onunload","onvolumechange","onwaiting","onwheel","open","optimum","page","pattern","placeholder","poster","preload","readonly","rel","required","reversed","rows","rowspan","sandbox","scope","selected","shape","size","sizes","span","spellcheck","src","srcdoc","srclang","srcset","start","step","style","tabindex","target","textContent","title","translate","type","usemap","value","width","wrap"]');
     referencePrefix = "ref:";
     tree = [];
+    dontAlterInstance = false;
+    data = {};
+    elements = {};
 
-    constructor(elements, dataBinder) {
-        this.elements = elements;
+    constructor(elements = undefined, dataBinder = undefined, options = undefined) {
+        if (options !== undefined) {
+            if (options.referencePrefix !== undefined) {
+                this.referencePrefix = options.referencePrefix;
+            }
+
+            if (options.dontAlterInstance !== undefined) {
+                this.dontAlterInstance = options.dontAlterInstance;
+            }
+
+            if (options.data !== undefined) {
+                this.data = options.data;
+            }
+        }
+
+        if (elements !== undefined) {
+            this.elements = elements;
+        } else {
+            this.elements = {};
+        }
+
         if (dataBinder !== undefined) {
             this.dataBinder = dataBinder;
         } else {
@@ -93,17 +119,55 @@ class Jens {
         checkForDebugMode();
     }
 
+    addTemplates(templates) {
+        if (templates.constructor !== Object) {
+            return;
+        }
+
+        for (let key in templates) {
+            if (this.elements.hasOwnProperty(key)) {
+                console.warn(`Template with name "${key}" already exists. Overwriting.`);
+            }
+            this.elements[key] = templates[key];
+        }
+
+        return this;
+    }
+
+    addData(data) {
+        if (data.constructor !== Object) {
+            return;
+        }
+
+        for (let key in data) {
+            if (this.data.hasOwnProperty(key)) {
+                console.warn(`Data with name "${key}" already exists. Overwriting.`);
+            }
+            this.data[key] = data[key];
+        }
+
+        return this;
+    }
+
+    buildTemplate(template, ignoreTree = true) {
+        if (template.constructor === String) {
+            template = this.elements[template];
+            if (template === undefined) {
+                console.error(`Template with name "${template}" does not exist.`);
+                return null;
+            }
+        }
+
+        return this.createFromTemplate(template, this.data, ignoreTree);
+    }
+
     resetTree() {
         this.tree = [];
     }
 
-    createFromTemplateName(templateName, data = {}, ignoreTree = true) {
+    createFromTemplateName(templateName, data = {}, ignoreTree = true, resolvingDepth = 0) {
         let template = this.elements[templateName];
-        if (template === undefined) {
-            return null;
-        }
-        if (!ignoreTree) this.addToTree(this.tree, this.getTreeId(template, data, template.tag), data);
-        return this.parseElement(template, data);
+        return this.createFromTemplate(template, data, ignoreTree, resolvingDepth);
     }
 
     getTreeId(template, data, name) {
@@ -111,11 +175,13 @@ class Jens {
         return crypto.hash(JSON.stringify(template)+JSON.stringify(data)).toString()+"_"+name;
     }
 
-    createFromTemplate(template, data = {}, ignoreTree = true) {
+    createFromTemplate(template, data = {}, ignoreTree = true, resolvingDepth = 0) {
         if (template === undefined) {
             return null;
         }
-        if (!ignoreTree) this.addToTree(this.tree, this.getTreeId(template, data, template.tag), data);
+        if (!ignoreTree) {
+            this.addToTree(this.tree, this.getTreeId(template, data, template.tag), data);
+        }
         return this.parseElement(template, data);
     }
 
@@ -123,7 +189,8 @@ class Jens {
         return document.createTextNode("");
     }
 
-    parseElement(element, data) {
+    parseElement(element, data, resolvingDepth = 0) {
+        resolvingDepth++;
         if (this.tree.length > 2000) {
             throw new Error("Can't parse more than 2000 templates at once. Did you define a circular reference?");
         }
@@ -136,40 +203,15 @@ class Jens {
         }
 
         let parsedElement;
-        if (element.template !== undefined) {
-            if (element.data !== undefined) {
-                for (let key in element.data) {
-                    data[key] = element.data[key];
-                }
-            }
-            let template = this.getData(element.template, data);
-            parsedElement = this.createFromTemplateName(template, data);
-        } else if (element.templateList !== undefined) {
-            if (element.dataEndpoint !== undefined && element.keyMap !== undefined) {
-                let data = this.getJsonFromEndpoint(element.dataEndpoint);
-                let uuid = Jens.UUID.generate();
-                let list = document.createElement("div");
-                list.setAttribute("uuid", uuid);
-                data.then((data) => {
-                    this.resetTree();
-                    this.addDataToList(data, element, uuid, this);
-                });
-                parsedElement = list;
-            }
-        } else {
-            parsedElement = document.createElement(element.tag);
-        }
+        parsedElement = this.parseElementTag(element, data, resolvingDepth);
 
         if (parsedElement instanceof HTMLUnknownElement) {
-            parsedElement = this.createFromTemplate(element.tag, data);
+            parsedElement = this.createFromTemplate(element.tag, data, true, resolvingDepth);
         } else {
             parsedElement = this.populateFromElement(parsedElement, element, data);
-            if (element.children !== undefined) {
-                for (let child of element.children) {
-                    parsedElement.appendChild(this.parseElement(child, data));
-                }
-            }
         }
+
+        parsedElement = this.addChildrenToElement(parsedElement, element.children, data, resolvingDepth);
 
         if (element.onappend !== undefined) {
             element.onappend(parsedElement, data);
@@ -181,20 +223,81 @@ class Jens {
         }
 
         parsedElement.classList.add("jensJsTemplate");
+        if (debugModeEnabled() && element.template !== undefined) {
+            console.log({ depth: resolvingDepth }, { parsed: parsedElement }, { data: data }, { source: element });
+        }
 
         return parsedElement;
     }
 
-    addDataToList(data, element, uuid, jens) {
+    addChildrenToElement(element, children, data, resolvingDepth = 0) {
+        if (children !== undefined) {
+            for (let child of children) {
+                element.appendChild(this.parseElement(child, data, resolvingDepth));
+            }
+        }
+        return element;
+    }
+
+    parseElementTag(element, data, resolvingDepth) {
+        if (element.template !== undefined) {
+            if (element.data !== undefined) {
+                for (let key in element.data) {
+                    data[key] = element.data[key];
+                }
+            }
+            const template = this.getData(element.template, data);
+            return this.createFromTemplateName(template, data, true, resolvingDepth);
+        } else if (element.templateList !== undefined) {
+            if (element.dataEndpoint !== undefined) {
+                return this.populateElementFromEndpoint(element, data);
+            } else if (element.data !== undefined) {
+                return this.populateElementFromList(element, data);
+            } else {
+                throw new Error("No data or dataEndpoint defined for templateList");
+            }
+        } else {
+            return document.createElement(element.tag);
+        }
+    }
+
+    populateElementFromEndpoint(element, data) {
+        let jsonData = this.getJsonFromEndpoint(this.getData(element.dataEndpoint, data));
+        let uuid = Jens.UUID.generate();
+
+        let list = document.createElement(element.tag ?? "div");
+        list.setAttribute("uuid", uuid);
+        jsonData.then((data) => {
+            this.resetTree();
+            this.addDataToList(data, element, list, this);
+        });
+        return list;
+    }
+
+    populateElementFromList(element, data) {
+        let list = document.createElement(element.tag ?? "div");
+        let uuid = Jens.UUID.generate();
+        list.setAttribute("uuid", uuid);
+        let listData = this.getData(element.data, data);
+        if (listData.constructor !== Array) {
+            console.log({element, data});
+            throw new Error("Data for list element is not an array");
+        }
+        this.addDataToList(listData, element, list, this);
+        return list;
+    }
+
+    addDataToList(data, element, listNode, jens) {
         let elementList = [];
         for (let elementData of data) {
-            for (let key in element.keyMap) {
-                this.mapDataSingle(element, key, elementData, data);
+            if (element.keyMap !== undefined) {
+                for (let key in element.keyMap) {
+                    this.mapDataSingle(element, key, elementData, data);
+                }
             }
             let listElement = jens.createFromTemplateName(element.templateList, data, true);
             elementList.push(listElement);
         }
-        let listNode = document.querySelector('[uuid="'+uuid+'"]');
         jens.appendToListNode(elementList, listNode);
     }
 
@@ -420,7 +523,7 @@ class Jens {
                 let refData = this.getData(ref[property], data);
                 if (refData !== undefined) {
                     this.writeToProperty(node, refData, property, overwriteProperty);
-                    return node
+                    return node;
                 }
             }
             this.writeToProperty(node, ref[property], property, overwriteProperty);
@@ -438,7 +541,10 @@ class Jens {
     }
 
     getData(property, data) {
-        if (typeof(property) !== "string") {
+        if (property === undefined || property === null) {
+            return undefined;
+        }
+        if (property.constructor !== String) {
             return property;
         }
         try {
