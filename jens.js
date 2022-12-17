@@ -522,20 +522,21 @@ class Jens {
             if (data !== null) {
                 let refData = this.getData(ref[property], data);
                 if (refData !== undefined) {
-                    this.writeToProperty(node, refData, property, overwriteProperty);
+                    this.writeToProperty(node, refData, property, overwriteProperty, data);
                     return node;
                 }
             }
-            this.writeToProperty(node, ref[property], property, overwriteProperty);
+            this.writeToProperty(node, ref[property], property, overwriteProperty, data);
         }
         return node;
     }
 
-    writeToProperty(node, value, property, overrideProperty) {
-        if (overrideProperty !== undefined) {
-            node[overrideProperty] = value;
+    writeToProperty(node, value, property, overrideProperty, data) {
+        const writeProperty = overrideProperty === undefined ? property : overrideProperty;
+        if (!writeProperty.startsWith("on") && value.constructor === Function) {
+            node[writeProperty] = value(data);
         } else {
-            node[property] = value;
+            node[writeProperty] = value;
         }
         return node;
     }
@@ -555,17 +556,30 @@ class Jens {
         if (!property.startsWith(this.referencePrefix)) {
             return property;
         }
-
-        let lookupValue = data[property.substring(this.referencePrefix.length)];
-        if (data !== undefined && lookupValue !== undefined) {
-            let tempData = this.getData(lookupValue, data);
-            if (tempData !== lookupValue) {
-                return tempData;
-            } else {
-                return lookupValue;
-            }
+        const lookupKey = property.substring(this.referencePrefix.length);
+        if (data === undefined) {
+            return lookupKey;
         }
-        return property.substring(this.referencePrefix.length);
+
+        if (lookupKey.includes('.')) {
+            let parts = lookupKey.split('.');
+            let refData = data;
+            for (let part of parts) {
+                if (refData[part] === undefined) {
+                    return lookupKey;
+                }
+                refData = refData[part];
+            }
+            return refData;
+        }
+
+        const lookupValue = data[lookupKey];
+        const recursiveData = this.getData(lookupValue, data);
+        if (recursiveData !== lookupValue) {
+            return recursiveData;
+        } else {
+            return lookupValue;
+        }
     }
 
     async getJsonFromEndpoint(dataEndpoint) {
